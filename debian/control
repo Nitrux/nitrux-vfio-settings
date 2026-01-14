@@ -1,4 +1,4 @@
-Source: nitrux-vfio-enablement
+Source: nitrux-vfio-settings
 Section: misc
 Priority: optional
 Maintainer: Uri Herrera <uri_herrera@nxos.org>
@@ -7,9 +7,9 @@ Standards-Version: 4.6.2
 Homepage: http://nxos.org
 
 
-Package: nitrux-vfio-enablement
+Package: nitrux-vfio-settings
 Architecture: amd64
-Depends: ${shlibs:Depends}, ${misc:Depends}, ipxe-qemu, libslirp0, ovmf, qemu-system-data, seabios, swtpm
-Description: Enable VFIO in Nitrux
+Depends: ${shlibs:Depends}, ${misc:Depends}, ipxe-qemu, libslirp0, ovmf, qemu-system-data, seabios, swtpm, qemu-system-x86
+Description: Add VFIO support
  Adds module and initramfs-tools configurations files
-  to enable VFIO passthrough in Nitrux
+  to enable PCIe passthrough in Nitrux.

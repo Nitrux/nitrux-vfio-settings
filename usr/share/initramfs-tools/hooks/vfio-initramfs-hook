@@ -19,5 +19,8 @@ esac
 # shellcheck source=/dev/null
 . /usr/share/initramfs-tools/hook-functions
 
-# Do nothing for now.
-
+# Add VFIO modules to initramfs for early loading
+manual_add_modules vfio
+manual_add_modules vfio_iommu_type1
+manual_add_modules vfio_virqfd
+manual_add_modules vfio_pci

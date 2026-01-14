@@ -1,3 +1,30 @@
 #!/usr/bin/env bash
 
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright 2024-2026 <Nitrux Latinoamericana S.C. <hello@nxos.org>>
+
+
+# -- Exit on errors.
+
+set -e
+
+
+# -- Cleanup the modules configuration.
+
+if [ "$1" = "purge" ]; then
+    if [ -f /etc/initramfs-tools/modules ]; then
+        sed -i '/^vfio$/d' /etc/initramfs-tools/modules
+        sed -i '/^vfio_iommu_type1$/d' /etc/initramfs-tools/modules
+        sed -i '/^vfio_virqfd$/d' /etc/initramfs-tools/modules
+        sed -i '/^vfio_pci$/d' /etc/initramfs-tools/modules
+    fi
+
+    rm -f /etc/modules-load.d/vfio-modules-config.conf
+
+    if command -v update-initramfs >/dev/null 2>&1; then
+        echo "Updating initramfs..."
+        update-initramfs -u
+    fi
+fi
+
 exit 0

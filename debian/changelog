@@ -1,3 +1,13 @@
+nitrux-vfio-settings (0.1.2)  nitrux; urgency=medium
+
+  * Fix postinst to prevent duplicate entries in configuration files.
+  * Implement proper cleanup in postrm script on package purge.
+  * Add VFIO module loading to initramfs hook script.
+  * Update copyright year to 2026.
+  * Rename package.
+
+ -- Uri Herrera <uri_herrera@nxos.org>  Tue, 14 Jan 2026 00:00:00 -0500
+
 nitrux-vfio-enablement (0.1.1)  nitrux; urgency=medium
 
   * Add dependencies to this package.
