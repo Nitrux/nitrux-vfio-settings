@@ -1,8 +1,10 @@
-# Nitrux VFIO Enablement
+# Nitrux VFIO Settings
 
-This package adds the initramfs-tools and modules configuration to enable VFIO in Nitrux.
+![](https://raw.githubusercontent.com/Nitrux/luv-icon-theme/master/Luv/mimetypes/64/package-x-generic.svg)
+
+Custom VFIO settings for Nitrux.
 
 # Issues
 If you find problems with the contents of this repository please create an issue.
 
-©2020 Nitrux Latinoamericana S.C.
+©2026 Nitrux Latinoamericana S.C.
