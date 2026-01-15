@@ -112,8 +112,10 @@ capture_group_for_gpu() {
   fail=0
   skip=0
   target=0
+
   for d in "$grp"/devices/*; do
-    [ -d "$d" ] || continue
+    [ -e "$d" ] || continue
+
     if is_vfio_target "$d"; then
       target=$((target + 1))
       if bind_dev_to_vfio "$d"; then
@@ -123,6 +125,7 @@ capture_group_for_gpu() {
       fi
     else
       skip=$((skip + 1))
+      log "[VxM] skipping non-target device ${d##*/}"
     fi
   done
 

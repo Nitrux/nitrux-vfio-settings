@@ -1,3 +1,9 @@
+nitrux-vfio-settings (0.1.8)  nitrux; urgency=medium
+
+  * Ensures that if a USB controller or Network card is in the same IOMMU group, it is skipped rather than seized.
+
+ -- Uri Herrera <uri_herrera@nxos.org>  Thu, 15 Jan 2026 16:52:00 -0500
+
 nitrux-vfio-settings (0.1.7)  nitrux; urgency=medium
 
   * On systems where the secondary GPU shares an IOMMU group with USB/SATA/NIC/etc., the script will not bind those controllers, so it avoids the “black screen + no input” and “cannot mount root” failure modes.
