@@ -43,15 +43,23 @@ find /sys/devices/pci* -name boot_vga -exec sh -c '
   GPU="${i%/*}"
   AUDIO="${GPU%.0}.1"
 
-  # If boot_vga is 0 (Secondary GPU)
+  # -- If boot_vga is 0 (Secondary GPU).
+
   if grep -q 0 "$i"; then
     echo "[VxM-DEBUG] Binding $GPU to vfio-pci" > /dev/console
+
     echo "vfio-pci" > "$GPU"/driver_override
+
+    if [ -e "$GPU/driver" ]; then
+        echo "$GPU" > "$GPU/driver/unbind"
+    fi
+
     if [ -d "$AUDIO" ]; then
         echo "vfio-pci" > "$AUDIO"/driver_override
     fi
     
-    # Force re-probe to make the override take effect
+    # -- Force re-probe to make the override take effect.
+
     echo "$GPU" > /sys/bus/pci/drivers_probe
   fi
 ' sh {} \;

@@ -1,3 +1,9 @@
+nitrux-vfio-settings (0.1.6)  nitrux; urgency=medium
+
+  * Update vfio-override.
+
+ -- Uri Herrera <uri_herrera@nxos.org>  Thu, 15 Jan 2026 02:52:00 -0500
+
 nitrux-vfio-settings (0.1.5)  nitrux; urgency=medium
 
   * Update initramfs scripts.
