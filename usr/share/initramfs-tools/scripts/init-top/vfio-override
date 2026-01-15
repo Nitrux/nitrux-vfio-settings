@@ -48,23 +48,29 @@ fi
 bind_dev_to_vfio() {
   dev="$1"
   bdf="${dev##*/}"
-  if [ ! -e "$dev/driver_override" ]; then
+  dev_dir="/sys/bus/pci/devices/$bdf"
+  if [ ! -d "$dev_dir" ]; then
+    log "[VxM] $bdf not present under /sys/bus/pci/devices; skipping"
+    return 1
+  fi
+
+  if [ ! -e "$dev_dir/driver_override" ]; then
     log "[VxM] $bdf has no driver_override; skipping"
     return 1
   fi
 
-  printf '%s' vfio-pci > "$dev/driver_override" 2>/dev/null || {
+  printf '%s' vfio-pci > "$dev_dir/driver_override" 2>/dev/null || {
     log "[VxM] $bdf failed to set driver_override"
     return 1
   }
 
-  if [ -e "$dev/driver/unbind" ]; then
-    printf '%s' "$bdf" > "$dev/driver/unbind" 2>/dev/null
+  if [ -e "$dev_dir/driver/unbind" ]; then
+    printf '%s' "$bdf" > "$dev_dir/driver/unbind" 2>/dev/null
   fi
 
   printf '%s' "$bdf" > /sys/bus/pci/drivers_probe 2>/dev/null
 
-  drv="$(readlink -f "$dev/driver" 2>/dev/null || true)"
+  drv="$(readlink -f "$dev_dir/driver" 2>/dev/null || true)"
   case "$drv" in
     */vfio-pci) log "[VxM] $bdf bound to vfio-pci"; return 0 ;;
     "") log "[VxM] $bdf has no driver after probe"; return 1 ;;
@@ -72,11 +78,21 @@ bind_dev_to_vfio() {
   esac
 }
 
+is_vfio_target() {
+  dev="$1"
+  bdf="${dev##*/}"
+  cls="$(cat "/sys/bus/pci/devices/$bdf/class" 2>/dev/null || true)"
+  case "$cls" in
+    0x03????|0x040300) return 0 ;;
+  esac
+  return 1
+}
+
 is_vga_or_3d() {
   dev="$1"
   cls="$(cat "$dev/class" 2>/dev/null || true)"
   case "$cls" in
-    0x030000|0x030200) return 0 ;;
+    0x03????) return 0 ;;
   esac
   return 1
 }
@@ -94,21 +110,33 @@ capture_group_for_gpu() {
 
   ok=0
   fail=0
+  skip=0
+  target=0
   for d in "$grp"/devices/*; do
     [ -d "$d" ] || continue
-    if bind_dev_to_vfio "$d"; then
-      ok=$((ok + 1))
+    if is_vfio_target "$d"; then
+      target=$((target + 1))
+      if bind_dev_to_vfio "$d"; then
+        ok=$((ok + 1))
+      else
+        fail=$((fail + 1))
+      fi
     else
-      fail=$((fail + 1))
+      skip=$((skip + 1))
     fi
   done
 
-  if [ "$fail" -ne 0 ]; then
-    log "[VxM] group ${grp##*/} capture incomplete: ok=$ok fail=$fail"
+  if [ "$target" -eq 0 ]; then
+    log "[VxM] group ${grp##*/} has no VFIO targets; skipping"
     return 1
   fi
 
-  log "[VxM] group ${grp##*/} capture complete: ok=$ok fail=$fail"
+  if [ "$fail" -ne 0 ]; then
+    log "[VxM] group ${grp##*/} capture incomplete: ok=$ok fail=$fail skip=$skip"
+    return 1
+  fi
+
+  log "[VxM] group ${grp##*/} capture complete: ok=$ok fail=$fail skip=$skip"
   return 0
 }
 

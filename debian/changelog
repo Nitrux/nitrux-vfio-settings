@@ -1,3 +1,10 @@
+nitrux-vfio-settings (0.1.7)  nitrux; urgency=medium
+
+  * On systems where the secondary GPU shares an IOMMU group with USB/SATA/NIC/etc., the script will not bind those controllers, so it avoids the “black screen + no input” and “cannot mount root” failure modes.
+  * If a GPU’s IOMMU group includes extra non-GPU devices, the script will log them as skip=... and still bind only the GPU display/audio functions. This is safe for boot, even if it prevents strict “whole-group” VFIO requirements for some passthrough setups.
+
+ -- Uri Herrera <uri_herrera@nxos.org>  Thu, 15 Jan 2026 16:22:00 -0500
+
 nitrux-vfio-settings (0.1.6)  nitrux; urgency=medium
 
   * Functional vfio-override.
