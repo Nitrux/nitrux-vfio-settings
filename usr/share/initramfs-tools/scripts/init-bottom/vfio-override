@@ -37,26 +37,44 @@ prereqs)
    ;;
 esac
 
+# -- DEBUG: Print to console.
+
+echo "[VxM-DEBUG] Checking for Static Binding..." > /dev/console
+
+
 # -- Check if the "Static Bind" trigger file exists on the real root filesystem.
 
-# shellcheck disable=SC2154
-if [ ! -f "${rootmnt}/etc/vxm/static-bind-enabled" ]; then
+if [ -z "${rootmnt}" ]; then
+    rootmnt="/root"
+fi
+
+TRIGGER="${rootmnt}/etc/vxm/static-bind-enabled"
+
+if [ ! -f "$TRIGGER" ]; then
+    echo "[VxM-DEBUG] Trigger file not found at $TRIGGER" > /dev/console
     exit 0
 fi
+
+echo "[VxM-DEBUG] Trigger found! Seizing secondary GPUs..." > /dev/console
+
+modprobe -v vfio-pci > /dev/console 2>&1
 
 find /sys/devices/pci* -name boot_vga -exec sh -c '
   i="$1"
   GPU="${i%/*}"
   AUDIO="${GPU%.0}.1"
 
-  # If boot_vga == 0 (It is NOT the primary GPU)
+  # If boot_vga is 0 (Secondary GPU)
   if grep -q 0 "$i"; then
-    # Force bind to vfio-pci
+    echo "[VxM-DEBUG] Binding $GPU to vfio-pci" > /dev/console
     echo "vfio-pci" > "$GPU"/driver_override
     if [ -d "$AUDIO" ]; then
         echo "vfio-pci" > "$AUDIO"/driver_override
     fi
+    
+    # Force re-probe to make the override take effect
+    echo "$GPU" > /sys/bus/pci/drivers_probe
   fi
 ' sh {} \;
 
-modprobe -i vfio-pci
+echo "[VxM-DEBUG] Static Binding Complete." > /dev/console
