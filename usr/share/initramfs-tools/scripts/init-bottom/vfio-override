@@ -4,64 +4,128 @@
 # Copyright 2025 <Nitrux Latinoamericana S.C. <hello@nxos.org>>
 
 PREREQ=""
-prereqs()
-{
-   echo "$PREREQ"
-}
+prereqs() { echo "$PREREQ"; }
 
-case $1 in
-prereqs)
-   prereqs
-   exit 0
-   ;;
+case "${1:-}" in
+  prereqs) prereqs; exit 0 ;;
 esac
 
-# -- DEBUG: Print to console.
+log() { printf '%s\n' "$*" > /dev/console; }
 
-echo "[VxM-DEBUG] Checking for Static Binding..." > /dev/console
+cmdline_has_flag() {
+  while read -r a; do
+    for p in $a; do
+      case "$p" in
+        vxm.static_bind=1|vxm.static_bind=yes|vxm.static_bind=true|vxm.static_bind=on) return 0 ;;
+      esac
+    done
+  done < /proc/cmdline
+  return 1
+}
 
-
-# -- Check if the "Static Bind" trigger file exists on the real root filesystem.
-
-if [ -z "${rootmnt}" ]; then
-    rootmnt="/root"
-fi
-
-TRIGGER="${rootmnt}/etc/vxm/static-bind-enabled"
-
-if [ ! -f "$TRIGGER" ]; then
-    echo "[VxM-DEBUG] Trigger file not found at $TRIGGER" > /dev/console
-    exit 0
-fi
-
-echo "[VxM-DEBUG] Trigger found! Seizing secondary GPUs..." > /dev/console
-
-modprobe -v vfio-pci > /dev/console 2>&1
-
-find /sys/devices/pci* -name boot_vga -exec sh -c '
-  i="$1"
-  GPU="${i%/*}"
-  AUDIO="${GPU%.0}.1"
-
-  # -- If boot_vga is 0 (Secondary GPU).
-
-  if grep -q 0 "$i"; then
-    echo "[VxM-DEBUG] Binding $GPU to vfio-pci" > /dev/console
-
-    echo "vfio-pci" > "$GPU"/driver_override
-
-    if [ -e "$GPU/driver" ]; then
-        echo "$GPU" > "$GPU/driver/unbind"
-    fi
-
-    if [ -d "$AUDIO" ]; then
-        echo "vfio-pci" > "$AUDIO"/driver_override
-    fi
-    
-    # -- Force re-probe to make the override take effect.
-
-    echo "$GPU" > /sys/bus/pci/drivers_probe
+ensure_mounted() {
+  m="$1"
+  p="$2"
+  if ! mountpoint -q "$p" 2>/dev/null; then
+    mount -t "$m" "$m" "$p" 2>/dev/null
   fi
-' sh {} \;
+}
 
-echo "[VxM-DEBUG] Static Binding Complete." > /dev/console
+ensure_mounted proc /proc
+ensure_mounted sysfs /sys
+
+if ! cmdline_has_flag; then
+  exit 0
+fi
+
+log "[VxM] vxm.static_bind enabled; attempting VFIO capture"
+
+if ! modprobe vfio-pci >/dev/console 2>&1; then
+  log "[VxM] modprobe vfio-pci failed"
+  exit 1
+fi
+
+bind_dev_to_vfio() {
+  dev="$1"
+  bdf="${dev##*/}"
+  if [ ! -e "$dev/driver_override" ]; then
+    log "[VxM] $bdf has no driver_override; skipping"
+    return 1
+  fi
+
+  printf '%s' vfio-pci > "$dev/driver_override" 2>/dev/null || {
+    log "[VxM] $bdf failed to set driver_override"
+    return 1
+  }
+
+  if [ -e "$dev/driver/unbind" ]; then
+    printf '%s' "$bdf" > "$dev/driver/unbind" 2>/dev/null
+  fi
+
+  printf '%s' "$bdf" > /sys/bus/pci/drivers_probe 2>/dev/null
+
+  drv="$(readlink -f "$dev/driver" 2>/dev/null || true)"
+  case "$drv" in
+    */vfio-pci) log "[VxM] $bdf bound to vfio-pci"; return 0 ;;
+    "") log "[VxM] $bdf has no driver after probe"; return 1 ;;
+    *) log "[VxM] $bdf bound to ${drv##*/} (expected vfio-pci)"; return 1 ;;
+  esac
+}
+
+is_vga_or_3d() {
+  dev="$1"
+  cls="$(cat "$dev/class" 2>/dev/null || true)"
+  case "$cls" in
+    0x030000|0x030200) return 0 ;;
+  esac
+  return 1
+}
+
+capture_group_for_gpu() {
+  gpu_dev="$1"
+  gpu_bdf="${gpu_dev##*/}"
+  grp="$(readlink -f "$gpu_dev/iommu_group" 2>/dev/null || true)"
+  if [ -z "$grp" ] || [ ! -d "$grp/devices" ]; then
+    log "[VxM] $gpu_bdf has no iommu_group; cannot capture"
+    return 1
+  fi
+
+  log "[VxM] capturing IOMMU group ${grp##*/} for GPU $gpu_bdf"
+
+  ok=0
+  fail=0
+  for d in "$grp"/devices/*; do
+    [ -d "$d" ] || continue
+    if bind_dev_to_vfio "$d"; then
+      ok=$((ok + 1))
+    else
+      fail=$((fail + 1))
+    fi
+  done
+
+  if [ "$fail" -ne 0 ]; then
+    log "[VxM] group ${grp##*/} capture incomplete: ok=$ok fail=$fail"
+    return 1
+  fi
+
+  log "[VxM] group ${grp##*/} capture complete: ok=$ok fail=$fail"
+  return 0
+}
+
+found=0
+for bootvga in /sys/bus/pci/devices/*/boot_vga; do
+  [ -f "$bootvga" ] || continue
+  dev="${bootvga%/boot_vga}"
+  is_vga_or_3d "$dev" || continue
+  if [ "$(cat "$bootvga" 2>/dev/null)" = "0" ]; then
+    found=1
+    capture_group_for_gpu "$dev" || true
+  fi
+done
+
+if [ "$found" -eq 0 ]; then
+  log "[VxM] no non-boot VGA/3D devices found"
+fi
+
+log "[VxM] VFIO capture pass finished"
+exit 0
