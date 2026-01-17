@@ -1,6 +1,12 @@
+nitrux-vfio-settings (0.1.9)  nitrux; urgency=medium
+
+  * Ensure that if an audio device belonging to a GPU is on a separate IOMMU group, it is passed through.
+
+ -- Uri Herrera <uri_herrera@nxos.org>  Sat, 17 Jan 2026 16:52:00 -0500
+
 nitrux-vfio-settings (0.1.8)  nitrux; urgency=medium
 
-  * Ensures that if a USB controller or Network card is in the same IOMMU group, it is skipped rather than seized.
+  * Ensure that if a USB controller or Network card is in the same IOMMU group, it is skipped rather than seized.
 
  -- Uri Herrera <uri_herrera@nxos.org>  Thu, 15 Jan 2026 16:52:00 -0500
 

@@ -83,7 +83,7 @@ is_vfio_target() {
   bdf="${dev##*/}"
   cls="$(cat "/sys/bus/pci/devices/$bdf/class" 2>/dev/null || true)"
   case "$cls" in
-    0x03????|0x040300) return 0 ;;
+    0x03????|0x0403??) return 0 ;;  # VGA (0x03xxxx) and all Audio (0x0403xx)
   esac
   return 1
 }
@@ -144,13 +144,48 @@ capture_group_for_gpu() {
 }
 
 found=0
+captured_groups=""
+
 for bootvga in /sys/bus/pci/devices/*/boot_vga; do
   [ -f "$bootvga" ] || continue
   dev="${bootvga%/boot_vga}"
   is_vga_or_3d "$dev" || continue
   if [ "$(cat "$bootvga" 2>/dev/null)" = "0" ]; then
     found=1
-    capture_group_for_gpu "$dev" || true
+    gpu_bdf="${dev##*/}"
+
+    # Capture the GPU's IOMMU group
+    if capture_group_for_gpu "$dev"; then
+      grp="$(readlink -f "$dev/iommu_group" 2>/dev/null || true)"
+      if [ -n "$grp" ]; then
+        captured_groups="$captured_groups ${grp##*/}"
+      fi
+    fi
+
+    # CRITICAL FIX: Also capture related audio devices (function .1)
+    # Modern GPUs often have audio in a SEPARATE IOMMU group
+    # Extract bus:device from GPU BDF (e.g., 0000:03:00.0 -> 0000:03:00)
+    bus_dev="${gpu_bdf%.*}"
+    audio_bdf="${bus_dev}.1"
+    audio_dev="/sys/bus/pci/devices/$audio_bdf"
+
+    if [ -d "$audio_dev" ]; then
+      log "[VxM] Found related audio device: $audio_bdf"
+      audio_grp="$(readlink -f "$audio_dev/iommu_group" 2>/dev/null || true)"
+
+      # Only capture if it's in a different group (avoid double-capture)
+      if [ -n "$audio_grp" ]; then
+        audio_grp_num="${audio_grp##*/}"
+        case " $captured_groups " in
+          *" $audio_grp_num "*) log "[VxM] Audio device already captured in group $audio_grp_num" ;;
+          *)
+            if capture_group_for_gpu "$audio_dev"; then
+              captured_groups="$captured_groups $audio_grp_num"
+            fi
+            ;;
+        esac
+      fi
+    fi
   fi
 done
 
