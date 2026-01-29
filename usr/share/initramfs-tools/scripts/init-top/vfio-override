@@ -162,7 +162,6 @@ for bootvga in /sys/bus/pci/devices/*/boot_vga; do
       fi
     fi
 
-    # CRITICAL FIX: Also capture related audio devices (function .1)
     # Modern GPUs often have audio in a SEPARATE IOMMU group
     # Extract bus:device from GPU BDF (e.g., 0000:03:00.0 -> 0000:03:00)
     bus_dev="${gpu_bdf%.*}"
